@@ -1,0 +1,742 @@
+---
+title: "UGR Modelos respuesta discreta Tema 4"
+author: "franmarq@gmail.com"
+date: '2022-12-12'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(nnet)
+library(MASS)
+
+
+```
+
+lectura de la data
+
+```{r readdata}
+Chapman.Cuali<-read.csv("Chapman_Cuali.csv",header=T,sep=",")
+
+Chapman.Cuali$Presion<-(as.factor(Chapman.Cuali$Presion))
+Chapman.Cuali$IMC<-(as.factor(Chapman.Cuali$IMC))
+                        
+
+
+str(Chapman.Cuali)
+
+```
+
+chequeo de las variables
+
+```{r levels}
+levels(Chapman.Cuali$Presion)
+contrasts(Chapman.Cuali$Presion)
+```
+cambio de factores
+
+```{r chnglevels}
+Chapman.Cuali$Presion<-factor(Chapman.Cuali$Presion,
+levels=c("Optima","Normal","Alta","Descompensada"))
+Chapman.Cuali$IMC<-factor(Chapman.Cuali$IMC,
+levels=c("Normal","Sobrepeso","Obesidad"))
+
+contrasts(Chapman.Cuali$Presion)
+contrasts(Chapman.Cuali$IMC)
+```
+
+
+1.2. Analisis de regresion logit de respuesta
+nominal con R
+
+1.2.1. Ajuste de regresion logit de respuesta nominal con variables explicativas cuantitativas y obser-
+vaciones en un Data.Frame
+
+```{r analisis1}
+library(nnet)
+Ajuste.Multinom.Cuanti<-multinom(Presion~Edad+Colesterol,
+data=Chapman.Cuali)
+summary(Ajuste.Multinom.Cuanti)
+```
+
+
+El resultado del ajuste con la funcion summary() muestra los parametros
+estimados y sus errores estandar.
+La funcion multinom() toma las transformaciones logit generalizadas con
+respecto a la categora de referencia.
+
+```{r cocientes}
+exp(summary(Ajuste.Multinom.Cuanti)$coefficients)
+
+```
+
+exp(b10) =0.4125941 es la ventaja de presion normal frente a optima
+para individuos con Edad=0 y Colesterol=0. Esta interpretacon
+no tiene sentido pues en la muestra no hay individuos con Edad=0 y
+Colesterol=0
+
+exp(b11) =0.9971692 es el cociente de ventajas de presion normal frente
+a optima cuando un individuo aumenta su edad en 1 a~no permaneciendo
+constante el nivel de colesterol. Equivalentemente, sera el cambio
+multiplicativo que se produce en la ventaja de presion normal frente a
+optima, cuando se aumenta un a~no la edad, permaneciendo constante
+el nivel de colesterol.
+
+la estimacion de los parametros se ha interpretado sin
+tener en cuenta la signicacion de estos parametros. La funcion multinom no
+muestra por defecto la signicacion de parametros. Para ello, asumiendo la
+distribucion normal asintotica de los parametros (al igual que en regresion
+logstica) se pueden obtener los valores experimentales del test de Wald para
+cada parametro a partir de la sentencia summary()
+
+```{r wald}
+summary(Ajuste.Multinom.Cuanti)$coefficients/
+summary(Ajuste.Multinom.Cuanti)$standard.errors
+
+```
+
+As mismo se pueden obtener los p-valores con las probabilidades de la
+distribucion normal:
+
+```{r pvalores}
+
+2*pnorm(abs(summary(Ajuste.Multinom.Cuanti)$coefficients/
+summary(Ajuste.Multinom.Cuanti)$standard.errors),lower.tail=F)
+
+```
+
+
+Tambien se podran utilizar los intervalos de conanza de los parametros
+para estudiar su signicacion:
+
+```{r intervalos}
+
+confint(Ajuste.Multinom.Cuanti)
+
+```
+
+
+As mismo se podra estudiar la signicacion de los cocientes de ventajas,
+mediante los intervalos de conanza:
+
+
+```{r interval2}
+
+exp(confint(Ajuste.Multinom.Cuanti))
+
+```
+
+
+Las probabilidades predichas de cada categora de la respuesta, en cada
+valor/es de la variable/s explicativa/s las proporciona el objeto de tipo
+multinom() con la sentencia predict() y la opcion type="probs". Para las
+10 primeras observaciones del chero de datos son:
+
+```{r predictval}
+
+predict(Ajuste.Multinom.Cuanti,type="probs")[1:10,]
+
+```
+
+el modelo predice,
+para cada valor/es de la variable/s explicativa/s la categora de la respuesta
+con mayor probabilidad. Estas predicciones tambien las proporciona la funci
+on multinom() con la sentencia predict() con la opcion type=class".
+
+```{r predictvalcat}
+predict(Ajuste.Multinom.Cuanti,type="class")[1:10]
+
+```
+
+Estas predicciones permiten obtener una tabla de clasicacion que tiene
+por las las observaciones y por columnas las predicciones:
+
+```{r tabla}
+
+table(Chapman.Cuali$Presion,
+predict(Ajuste.Multinom.Cuanti,type="class"))
+
+```
+
+
+Observese como con este modelo:
+Entre los individuos con presion optima, el modelo acierta en un 26.7857143
+por ciento.
+... etc
+
+El estudio de la bondad del ajuste del modelo multinomial solo es posible
+realizarlo comparando con el modelo saturado, esto es el que tiene tantos
+parametros estimados como observaciones. En el caso de datos no agrupados
+la log-verosimilitud del modelo saturado es nula, por tanto, para estudiar la
+bondad del ajuste del modelo multinomial en este caso el valor experimental
+del test (estadstico) sera la deviance del modelo y el p-valor el de la Chi
+cuadrado correspondiente:
+
+```{r deviance}
+Ajuste.Multinom.Cuanti$deviance
+pchisq(Ajuste.Multinom.Cuanti$deviance,591,lower.tail = F)
+
+```
+
+1.2.2. Ajuste de regresion logit de respuesta nominal
+con variables explicativas cuantitativas y cuali-
+tativas y observaciones en un Data.Frame
+
+```{r regreslogit}
+Ajuste.Multinom.Cuanli<-multinom(Presion~Edad+Colesterol+IMC,
+data=Chapman.Cuali)
+
+summary(Ajuste.Multinom.Cuanli)
+
+```
+
+Al igual que en el resto de modelos logit, la exponencial de los parametros
+estimados se pueden interpretar en terminos de cocientes de ventajas:
+
+```{r paramcociventaj}
+
+exp(summary(Ajuste.Multinom.Cuanli)$coefficients)
+
+```
+
+Para los parametros asociados a la variable IMC se tienen las siguientes
+interpretaciones:
+exp(b10) =0.3669406 es la ventaja de presion normal frente a optima
+para individuos con Edad=0, Colesterol=0 e IMC=Normal. Esta interpretac
+on no tiene sentido pues en la muestra no hay individuos con
+
+Como ya se indico en el caso de regresion logit binaria con variables explicativas
+cualitativas, la signicacion de la variable IMC no se puede estudiar a
+partir de la signicacion de los parametros, sino a traves de los test condicionales
+de razon de verosimilitudes. 
+
+En presencia de las variables cuantitativas
+Edad y Colesterol, la signicacion de la variable IMC se estudiara del siguiente
+modo:
+
+```{r significaIMC}
+anova(multinom(Presion~Edad+Colesterol+IMC,
+data=Chapman.Cuali),multinom(Presion~Edad+Colesterol,
+data=Chapman.Cuali))
+```
+
+
+Observese como el valor experimental del test es 12.2624 que para una
+Chi-cuadrado con 6 grados de libertad arroja un p-valor de 0.05636, que al
+5% de signicacion, me indica que la variable IMC no debe estar en el modelo
+(en presencia de la edad y el colesterol), pero no as a una signicacion del
+10 %.
+
+Los intervalos de conanza de los cocientes de ventajas:
+
+```{r intervcociente}
+
+exp(confint(Ajuste.Multinom.Cuanli))
+
+```
+
+
+Las probabilidades predichas y las categoras predichas (las 10 primeras):
+
+```{r probpredich}
+predict(Ajuste.Multinom.Cuanli,type="probs")[1:10,]
+predict(Ajuste.Multinom.Cuanli,type="class")[1:10]
+```
+La tabla de clasicacion:
+
+```{r tabclasif}
+table(Chapman.Cuali$Presion,
+predict(Ajuste.Multinom.Cuanli,type="class"))
+```
+
+bondad del ajuste
+
+```{r bondadajuste}
+Ajuste.Multinom.Cuanli$deviance
+
+pchisq(Ajuste.Multinom.Cuanli$deviance,585,lower.tail = F)
+
+
+```
+
+Que indica que el modelo de respuesta nominal es adecuado.
+Antes de terminar con este apartado vamos a mostrar el resultado de una
+seleccion stepwise de estas variables en un modelo multinomial:
+
+```{r seleccstep}
+Ajuste.Multinom.0<-multinom(Presion~1,data=Chapman.Cuali)
+Ajuste.Multinom.Step<-step(Ajuste.Multinom.0,
+scope=list(lower=Presion~1,upper=Presion~Edad+Colesterol+IMC),
+direction="both")
+
+```
+
+El metodo stepwise solo selecciona a la edad como predictora de la presion
+arterial.
+
+
+```{r readtable}
+
+#Chapman.Tabla.Frame<-read.table("ChapmanTabla.txt",header=TRUE,sep ="\t",stringsAsFactors = FALSE)
+
+Chapman.Tabla.Frame<-read.csv("ChapmanTabla.csv",header=T)
+as.data.frame(Chapman.Tabla.Frame)
+```
+
+Supondremos que hemos llamado a este Data.Frame Chapman.Tabla.Frame
+En este ejemplo se mostraran los mismos resultados vistos en las secciones
+anteriores, pero en este caso sin las interpretaciones. Solo aquellas cuestiones
+que dieran en algun aspecto con respecto a lo anterior se explicaran con
+cierto detalle.
+
+```{r regresdatagrup}
+
+Ajuste.Multinom.Tab<-multinom(Presion~IMC,data=Chapman.Tabla.Frame,weights=Frecuencia)
+
+summary(Ajuste.Multinom.Tab)
+
+```
+El resultado del ajuste con la funcion summary() muestra los parametros
+estimados y sus errores estandar.
+Al igual que en el resto de modelos logit, la exponencial de los parametros
+estimados se pueden interpretar en terminos de cocientes de ventajas:
+
+```{r expparam}
+exp(summary(Ajuste.Multinom.Tab)$coefficients)
+
+```
+
+Las interpretaciones seran analogas a las explicadas en la seccion anterior,
+pero sin tener en cuenta las variables explicativas cuantitativas (Edad
+y Colesterol).
+La signicacion de la variable IMC se estudia a traves de los test condicionales
+de razon de verosimilitudes:
+
+```{r signif IMC}
+anova(multinom(Presion~1,
+data=Chapman.Tabla.Frame,weights = Frecuencia),multinom(Presion~IMC,
+data=Chapman.Tabla.Frame,weights = Frecuencia))
+
+```
+
+Observese como el valor experimental del test es 15.43073 que para una
+Chi-cuadrado con 6 grados de libertad arroja un p-valor de 0.01715857 que
+indica que la variable IMC es signicatia para la prediccion de la Presion.
+Los intervalos de conanza de los cocientes de ventajas:
+
+```{r interval22}
+exp(confint(Ajuste.Multinom.Tab))
+```
+
+Las probabilidades predichas y las categoras predichas:
+
+```{r probpredch}
+predict(Ajuste.Multinom.Tab,type="probs")
+predict(Ajuste.Multinom.Tab,type="class")
+
+```
+
+
+Para la tabla de clasicacion habra que tener en cuenta cuantas veces se
+repite cada prediccion:
+
+```{r tablaclasif}
+
+table(rep(Chapman.Tabla.Frame$Presion,
+Chapman.Tabla.Frame$Frecuencia),
+rep(predict(Ajuste.Multinom.Tab,type="class"),
+Chapman.Tabla.Frame$Frecuencia))
+
+```
+
+
+####
+
+1.3. Ajuste de regresion logit de respuesta or-
+dinal con R
+1.3.1. Ajuste de regresion logit de respuesta ordinal
+con variables explicativas cuantitativas y obser-
+vaciones en un Data.Frame
+
+Para el ajuste del modelo de respuesta ordinal para la Presion a partir de
+las variables Edad y Colesterol, se utiliza la siguiente funcion de R.
+
+```{r regresordinal}
+Ajuste.Ordinal.Cuanti<-polr(Presion~Edad+Colesterol,
+data=Chapman.Cuali)
+summary(Ajuste.Ordinal.Cuanti)
+
+```
+
+Los parametros estimados junto con los elementos para el analisis de la
+signicacion de parametros (errores estandar de estimacion y valores experimentales
+del test de Wald) se obtienen con la matriz siguiente:
+
+
+```{r param}
+summary(Ajuste.Ordinal.Cuanti)$coefficients
+```
+
+Observese que esta salida muestra los errores estandar de estimacion de los
+parametros y los valores experimentales de los test de signicacion de los
+parametros, bajo el nombre de t value. Sin embargo no se muestran los
+p-valores de esos test de signicacion, para lo cual podramos utilizar la
+siguiente sentencia que asume distribucion normal de los estimadores de los
+parametros:
+
+```{r pvaluesord}
+2*pnorm(abs(summary(Ajuste.Ordinal.Cuanti)$coefficients[,"t value"]),
+lower.tail=F)
+
+```
+
+Al igual que en el resto de modelos logit, mediante la exponencial de
+los parametros estimados se pueden obtener interpretaciones en terminos de
+cocientes de ventajas, sin embargo en este caso se debe tener ciertas precauciones
+por los signos que se asumen en el modelo. En este caso el cociente de
+ventajas de que la respuesta tome valores menores que una cierta categora
+frente a que tome valores mayores, sera la exponencial del parametro, pero
+cambiada de signo.
+
+```{r expvalores}
+exp(-summary(Ajuste.Ordinal.Cuanti)$coefficients
+[c("Edad","Colesterol"),"Value"])
+
+```
+
+exp(􀀀b1) =0.9754795 es el cociente de ventajas de presion menor o
+igual a optima frente a mayor cuando un individuo aumenta su edad en
+1 a~no permaneciendo constante el nivel de colesterol. Equivalentemente,
+sera el cambio multiplicativo que se produce en la ventaja de presion
+menor o igual a optima frente a mayor, cuando se aumenta un a~no la
+edad, permaneciendo constante el nivel de colesterol.
+
+exp(􀀀b2) =0.9966618 es el cociente de ventajas de presion menor o
+igual a optima frente a mayor cuando un individuo aumenta su nivel
+de colesterol en 1 unidad permaneciendo constante la edad. Equivalentemente,
+sera el cambio multiplicativo que se produce en la ventaja de
+presion menor o igual a optima frente a mayor, cuando se aumenta el
+nivel de colesterol una unidad, permaneciendo constante la edad.
+
+Al ser el modelo de ventajas proporcionales estos cocientes de ventajas
+son los mismos para presiones menores o iguales a normal o alta frente
+a mayores.
+Sin embargo las ventajas asociadas a los terminos independientes no cambian,
+esto es, no hay que considerar cambio de signo:
+
+```{r ventjtermindep}
+exp(summary(Ajuste.Ordinal.Cuanti)$coefficients
+[c("Optima|Normal","Normal|Alta","Alta|Descompensada"),"Value"])
+```
+
+exp(b10) =2.8171681 es la ventaja de presion menor o igual a optima
+frente a mayor para individuos con Edad=0 y Colesterol=0. Esta interpretac
+on no tiene sentido pues en la muestra no hay individuos con
+Edad=0 y Colesterol=0
+exp(b20) =5.5858193 es la ventaja de presion menor o igual a normal
+frente a mayor para individuos con Edad=0 y Colesterol=0. Esta interpretac
+on no tiene sentido pues en la muestra no hay individuos con
+Edad=0 y Colesterol=0
+exp(b30) =8.0025946 es la ventaja de presion menor o igual a alta
+frente a mayor para individuos con Edad=0 y Colesterol=0. Esta interpretac
+on no tiene sentido pues en la muestra no hay individuos con
+Edad=0 y Colesterol=0.
+
+
+La estimacion de los parametros se ha interpretado sin tener en cuenta la
+signicacion de estos parametros.
+Tambien se podran utilizar los intervalos de conanza de los parametros
+para estudiar su signicacion:
+
+```{r intconfi}
+confint.default(Ajuste.Ordinal.Cuanti)
+```
+confint.default(Ajuste.Ordinal.Cuanti)
+
+A partir de la estimacion de parametros, se pueden obtener las estimaciones
+de la probabilidades acumuladas de cada categora de la respuesta.
+
+Las probabilidades predichas no acumuladas de cada categora de la respuesta,
+en cada valor/es de la variable/s explicativa/s las proporciona el objeto
+de tipo polr() con la sentencia predict() y la opcion type="probs".
+Para las 10 primeras observaciones del chero de datos son:
+
+```{r probpredich2}
+predict(Ajuste.Ordinal.Cuanti,type="probs")[1:10,]
+
+```
+
+Observese como las probabilidades por las suman la unidad como es de
+esperar en una distribucion multinomial.
+Una vez estimadas las probabilidades de cada categora, el modelo predice,
+para cada valor/es de la variable/s explicativa/s la categora de la respuesta
+con mayor probabilidad. Estas predicciones tambien las proporciona la funci
+on polr() con la sentencia predict() con la opcion type=class". Para
+las 10 primeras observaciones del chero de datos son:
+
+```{r probpedichcat}
+predict(Ajuste.Ordinal.Cuanti,type="class")[1:10]
+```
+
+Estas predicciones permiten obtener una tabla de clasicacion que tiene
+por las las observaciones y por columnas las predicciones:
+
+```{r tableobspredicc}
+table(Chapman.Cuali$Presion,
+predict(Ajuste.Ordinal.Cuanti,type="class"))
+
+```
+
+Observese como con este modelo:
+Entre los individuos con presion optima, el modelo acierta en un 25 por
+ciento.... etc
+
+
+Como en el caso de respuesta nominal, el estudio de la bondad del ajuste
+del modelo multinomial solo es posible realizarlo comparando con el modelo
+saturado, esto es el que tiene tantos parametros estimados como observaciones.
+En el caso de datos no agrupados la log-verosimilitud del modelo
+saturado es nula, por tanto, para estudiar la bondad del ajuste del modelo
+multinomial en este caso el valor experimental del test (estadstico) sera la
+deviance del modelo y el p-valor el de la Chi cuadrado correspondiente:
+
+```{r bondadajuste}
+Ajuste.Ordinal.Cuanti$deviance
+
+pchisq(Ajuste.Ordinal.Cuanti$deviance,595,lower.tail = F)
+
+```
+
+Hay que tener en cuenta que el modelo saturado tiene 3 parametros libres
+(probabilidades) en cada combinacion diferente de observaciones de las variables
+explicativas. En nuestro ejemplo, se tienen 200 combinaciones diferentes
+de observaciones de las variables explicativas (tantas como observaciones o
+casos) por lo que el numero de parametros libres del modelo saturado es 600.
+Como el modelo ajustado tiene 5 parametros, los grados de libertad de la
+distribucion Chi-Cuadrado del test de bondad de ajuste seran 595. Con esto,
+aceptamos el modelo multinomial como modelo adecuado para estos datos,
+frente al saturado.
+
+
+
+#####
+
+
+1.3.2. Ajuste de regresion logit de respuesta ordinal
+con variables explicativas cuantitativas y cuali-
+tativas y observaciones en un Data.Frame
+Supongamos que se quiere modelizar la presion arterial en funcion de la
+edad, el nivel de colesterol (ambas cuantitativas) y el IMC (cualitativa). En
+este ejemplo se mostraran los mismos resultados vistos en la seccion anterior,
+pero en este caso sin las interpretaciones. Solo aquellas cuestiones que dieran
+en algun aspecto con respecto a lo anterior se explicaran con cierto detalle.
+
+```{r modelocualicuanti}
+Ajuste.Ordinal.Cuanli<-polr(Presion~Edad+Colesterol+IMC,
+data=Chapman.Cuali)
+summary(Ajuste.Ordinal.Cuanli)$coefficients
+```
+
+El resultado del ajuste con la funcion summary() muestra los parametros
+estimados y sus errores estandar.
+
+Como ya se indico en el caso de regresion logit binaria con variables explicativas
+cualitativas, la signicacion de la variable IMC no se puede estudiar a
+partir de la signicacion de los parametros, sino a traves de los test condicionales
+de razon de verosimilitudes. En presencia de las variables cuantitativas
+Edad y Colesterol, la signicacion de la variable IMC se estudiara del siguiente
+modo:
+
+```{r testIMCsignifi}
+
+anova(polr(Presion~Edad+Colesterol+IMC,
+data=Chapman.Cuali),polr(Presion~Edad+Colesterol,
+data=Chapman.Cuali))
+
+```
+
+Observese como el valor experimental del test es 9.73053 que para una
+Chi-cuadrado con 2 grados de libertad arroja un p-valor de 0.007709785, que
+al 5% de signicacion, indica que la variable IMC debe estar en el modelo
+(en presencia de la edad y el colesterol).
+Las probabilidades predichas y las categoras predichas (las 10 primeras):
+
+```{r predicprobycateg}
+predict(Ajuste.Ordinal.Cuanli,type="probs")[1:10,]
+predict(Ajuste.Ordinal.Cuanli,type="class")[1:10]
+```
+
+
+La tabla de clasicacion:
+
+```{r tabclasifi}
+table(Chapman.Cuali$Presion,
+predict(Ajuste.Ordinal.Cuanli,type="class"))
+
+```
+
+La bondad del ajuste:
+
+```{r bondadajustedatagrup}
+Ajuste.Ordinal.Cuanli$deviance
+pchisq(Ajuste.Ordinal.Cuanli$deviance,593,lower.tail = F)
+```
+
+Que indica que el modelo de respuesta nominal es adecuado.
+Antes de terminar con este apartado vamos a mostrar el resultado de una
+seleccion stepwise de estas variables en un modelo multinomial:
+
+```{r seleccstepdatagrup}
+Ajuste.Ordinal.0<-polr(Presion~1,data=Chapman.Cuali)
+Ajuste.Ordinal.Step<-step(Ajuste.Ordinal.0,
+scope=list(lower=Presion~1,upper=Presion~Edad+Colesterol+IMC),
+direction="both")
+
+summary(Ajuste.Ordinal.Step)
+
+```
+
+El metodo stepwise selecciona las variables IMC y Colesterol como predictoras
+de la presion arterial.
+
+### 
+
+Ajuste de regresion logit de respuesta ordinal
+con observaciones en una tabla de frecuencias
+Supongamos que se quiere ajustar un modelo de respuesta multiple nominal
+para predecir las categoras de presion arterial a partir de las categoras
+del IMC, estando la informacion en una tabla de frecuencias
+
+Realmente se tratara de un ajuste de un modelo de regresion de respuesta
+multiple multinomial simple. Para realizar el ajuste con esta informacion, los
+datos deben estar en un Data.Frame con el siguiente formato:
+## Presion IMC Frecuencia
+## 1 Optima Normal 41
+## 2 Optima Sobrepeso 15
+...
+
+Supondremos que hemos llamado a este Data.Frame Chapman.Tabla.Frame
+En este ejemplo se mostraran los mismos resultados vistos en las secciones
+anteriores, pero en este caso sin las interpretaciones. Solo aquellas cuestiones
+que dieran en algun aspecto con respecto a lo anterior se explicaran con
+cierto detalle.
+
+```{r framecualcuantord}
+#ajuste para el analisis ordinal
+Chapman.Tabla.Frame2<-Chapman.Tabla.Frame
+Chapman.Tabla.Frame2$Presion<-as.factor(Chapman.Tabla.Frame2$Presion)
+
+Ajuste.Ordinal.Tab<-polr(Presion~IMC,
+data=Chapman.Tabla.Frame2,weights=Chapman.Tabla.Frame2$Frecuencia)
+summary(Ajuste.Ordinal.Tab)$coefficients
+```
+
+El resultado del ajuste con la funcion summary() muestra los parametros
+estimados y sus errores estandar.
+Al igual que en el resto de modelos logit, la exponencial de los parametros
+estimados se pueden interpretar en terminos de cocientes de ventajas:
+
+
+```{r expcociventa}
+exp(-summary(Ajuste.Ordinal.Tab)$coefficients)
+```
+
+La signicacion de la variable IMC se estudia a traves de los test condicionales
+de razon de verosimilitudes:
+
+```{r sigifIMCmodord}
+anova(polr(Presion~1,
+data=Chapman.Tabla.Frame2,weights = Frecuencia),polr(Presion~IMC,
+data=Chapman.Tabla.Frame2,weights = Frecuencia))
+```
+
+indica que la variable IMC es signicatia para la prediccion de la Presion.
+
+Las probabilidades predichas y las categoras predichas:
+
+```{r probcatpredichord}
+predict(Ajuste.Ordinal.Tab,type="probs")
+predict(Ajuste.Ordinal.Tab,type="class")
+```
+
+Observese como en este caso en lugar de 200 probabilidades predichas, se
+muestran 12, tantas como las tiene el Data.Frame. En realidad habra 200
+solo que cada una de ellas se repetira tantas veces como muestra la columna
+Frecuencia del Data.Frame.
+Para
+
+Para la tabla de clasicacion habra que tener en cuenta cuantas veces se
+repite cada prediccion:
+
+```{r tabprediccdatord}
+table(rep(Chapman.Tabla.Frame2$Presion,
+Chapman.Tabla.Frame2$Frecuencia),
+rep(predict(Ajuste.Ordinal.Tab,type="class"),
+Chapman.Tabla.Frame2$Frecuencia))
+```
+
+El estudio de la bondad del ajuste 
+
+
+cuando la informacion se encuentra en
+tablas, es ligeramente diferente al caso de datos no agrupados.
+En este caso para cada observacion de la variable explicativa (Normal,
+Sobrepeso, Obesidad) se tiene una estimacion de la probabilidad de cada
+categora de la respuesta, dada por la frecuencia relativa por las: modelo
+saturado.
+Frecuencias absolutas:
+
+Presion
+IMC  Optima Normal Alta Descompensada Total
+Normal 41 16 8 46 111
+Sobrepeso 15 12 8 44 79
+Obesidad 0 1 1 8 10
+
+
+Frecuencias relativas por las (probabilidades predichas del mo-
+delo saturado):
+Presion
+IMC Optima Normal Alta Descompensada Total
+Normal 0.3693694 0.1441441 0.0720721 0.4144144 1.00
+Sobrepeso 0.1898734 0.1518987 0.1012658 0.556962 1.00
+Obesidad 0 0.1 0.1 0.8 1.00
+
+```{r calcbondaddatord}
+DevSaturado <- -2*(   
+  41*log(0.3693694) +
+  16*log(0.1441441) +
+    8*log(0.0720721) +
+    46*log(0.4144144) +
+    15*log(0.1898734) +
+    12*log(0.1518987) +
+    8*log(0.1012658) +
+    44*log(0.556962) +
+    0*log(0.01) +
+    1*log(0.1) +
+  1*log(0.1) +
+  8*log(0.8)
+            )
+DevSaturado
+```
+
+Restando las dos deviances se tiene el estadstico de contraste
+
+```{r restadeviancesdatord}
+Estadistico<-Ajuste.Ordinal.Tab$deviance-DevSaturado
+Estadistico
+
+```
+
+El estadstico tiene distribucion Chi-Cuadrado y sus grados de libertad
+son la diferencia entre el numero de parametros del modelo saturado
+(12) y el numero de parametros del modelo multinomial (9). Por ello
+el p-valor del contraste sera:
+
+```{r valor pcontraste}
+pchisq(Estadistico,3,lower.tail = F)
+
+```
+Este procedimiento nos lleva a aceptar el modelo de resuesta ordinal como
+adecuado.
+
